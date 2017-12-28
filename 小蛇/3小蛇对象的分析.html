@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>今天天气不错</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+    
+    #map {
+      width: 800px;
+      height: 600px;
+      background-color: #CCCCCC;
+      position: relative;
+    }
+    
+    #map div {
+      /*用于设置地图中的食物，小蛇的盒子定位*/
+      position: absolute;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+  //贪食蛇案例中一共分为4个部分（对象）
+  //1 地图  2 食物 3 小蛇 4 游戏控制
+  
+  //食物对象
+  (function () {
+    
+    function Food(options) {
+      //每个食物所必须的属性
+      //宽 高 背景色 坐标 放置位置
+      this.width = options.width || 20;
+      this.height = options.height || 20;
+      this.bgColor = options.bgColor || "green";
+      
+      //坐标设置:只是为了在后期维护时，查看属性比較方便
+      this.x = 0;
+      this.y = 0;
+      
+      //放置位置
+      this.map = options.map;
+      
+      //用于保存当前存在的食物盒子的DOM对象
+      this.element = null;
+    }
+    
+    //对食物进行初始化操作(设置盒子的显示效果)
+    Food.prototype.init = function () {
+      //删除旧的食物盒子
+      if (this.element) {
+        this.map.removeChild(this.element);
+      }
+      
+      //1 创建食物盒子
+      var div = document.createElement("div");
+      //---为了在删除盒子时可以找到当前创建的盒子，先进行一次保存，保存在实例对象的属性中
+      this.element = div;
+      
+      //2 设置样式
+      div.style.width = this.width + "px";
+      div.style.height = this.height + "px";
+      div.style.backgroundColor = this.bgColor;
+      //3 放入到地图中
+      this.map.appendChild(div);
+      
+      //4 调用this的随机位置方法
+      this.setRandomPos();
+    };
+    
+    //设置食物盒子的随机位置
+    Food.prototype.setRandomPos = function () {
+      //先计算出随机的坐标值，再根据坐标值设置对应的left/top即可
+      //1 先计算可以容纳的坐标最大值
+      //this.map.offsetWidth / this.width
+      //2 获取范围内的随机坐标
+      this.x = Math.floor(Math.random() * this.map.offsetWidth / this.width);
+      this.y = Math.floor(Math.random() * this.map.offsetHeight / this.height);
+      
+      //3 根据坐标设置left和top属性
+      this.element.style.left = this.x * this.width + "px";
+      this.element.style.top = this.y * this.height + "px";
+    };
+    
+    var mapDiv = document.getElementById("map");
+    var f1 = new Food({
+      map: mapDiv
+    });
+    
+    f1.init();
+  })();
+  
+  //小蛇对象
+  (function () {
+    
+    function Snake(options) {
+      //分析小蛇对象需要哪些属性？
+      //宽 高 背景色 坐标 放置位置 运动方向
+      
+      //将宽高设置为统一的值，其他的坐标等属性进行分别设置
+      this.width = options.width || 20;
+      this.height = options.height || 20;
+      
+      //设置坐标:采用一种较为复杂的结构，目的是保存蛇身内每个小盒子的坐标值
+      this.body = [
+        //当前设置的为小蛇初始的坐标与颜色
+        {x: 3, y: 1, color: "red"},//蛇头
+        {x: 2, y: 1, color: "orange"},//蛇身
+        {x: 1, y: 1, color: "orange"},//蛇身
+      ];
+      //设置放置位置
+      this.map = options.map;
+      //设置运动方向
+      this.direction = options.direction || "right";
+      
+      //设置一个属性，用于保存蛇身的所有结构(DOM对象)，目的为删除时可以找到对应的元素
+      this.elements = [];
+    }
+    
+    //设置小蛇的显示的方法：
+    Snake.prototype.init = function () {
+      //1 创建小蛇中的每个部分（遍历this.body中的所有对象）
+      var div, body;
+      for (var i = 0; i < this.body.length; i++) {
+        div = document.createElement("div");
+        div.style.width = this.width + "px";
+        div.style.height = this.height + "px";
+        
+        body = this.body[i];
+        div.style.backgroundColor = body.color;
+        //设置left top
+        div.style.left = body.x * this.width + "px";
+        div.style.top = body.y * this.height + "px";
+        this.map.appendChild(div);
+      }
+    };
+    
+    //设置小蛇运动的方法：
+    Snake.prototype.move = function () {
+      //分析：
+      //小蛇移动时，需要内部的每个盒子都进行移动，移动是通过坐标的修改实现
+      //除蛇头以外，其余的蛇身中的每个部分都可以使用上一个蛇身的坐标值
+      //蛇头根据运动方向进行判断判断设置即可
+      var body;//用于保存蛇身中的某个对象
+      
+      //遇到的问题是：如果使用正向遍历的方式，导致所有的蛇身坐标均为蛇头的坐标值了
+      /*for (var i = 1; i < this.body.length; i++) {
+       //body表示蛇身中的某一个盒子的所有坐标
+       body = this.body[i];
+       //获取前一项的坐标值即可
+       body.x = this.body[i - 1].x;
+       body.y = this.body[i - 1].y;
+       }*/
+      
+      //需要使用反向遍历的方式：内部的代码不需修改
+      for (var i = this.body.length - 1; i >= 1; i--) {
+        //body表示蛇身中的某一个盒子的所有坐标
+        body = this.body[i];
+        //获取前一项的坐标值即可
+        body.x = this.body[i - 1].x;
+        body.y = this.body[i - 1].y;
+      }
+      //给蛇头的坐标进行单独设置
+      this.body[0].x++;
+      
+      //小蛇body中的所有坐标值更新后，需要进行重新的绘制操作
+      this.init();
+    };
+    
+    var map = document.getElementById("map");
+    var s1 = new Snake({
+      map: map
+    });
+    
+    s1.init();
+    s1.move();
+  })();
+
+</script>
+
+</body>
+</html>

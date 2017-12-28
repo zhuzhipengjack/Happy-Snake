@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>今天天气不错</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+    }
+    
+    #map {
+      width: 800px;
+      height: 600px;
+      background-color: #CCCCCC;
+      position: relative;
+    }
+    
+    #map div {
+      /*用于设置地图中的食物，小蛇的盒子定位*/
+      position: absolute;
+    }
+  </style>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script>
+  //贪食蛇案例中一共分为4个部分（对象）
+  //1 地图  2 食物 3 小蛇 4 游戏控制
+  
+  //食物对象
+  (function () {
+    
+    function Food(options) {
+      //每个食物所必须的属性
+      //宽 高 背景色 坐标 放置位置
+      this.width = options.width || 20;
+      this.height = options.height || 20;
+      this.bgColor = options.bgColor || "green";
+      
+      //坐标设置:只是为了在后期维护时，查看属性比較方便
+      this.x = 0;
+      this.y = 0;
+      
+      //放置位置
+      this.map = options.map;
+      
+      //用于保存当前存在的食物盒子的DOM对象
+      this.element = null;
+    }
+    
+    //对食物进行初始化操作(设置盒子的显示效果)
+    Food.prototype.init = function () {
+      //删除旧的食物盒子
+      if (this.element) {
+        this.map.removeChild(this.element);
+      }
+      
+      //1 创建食物盒子
+      var div = document.createElement("div");
+      //---为了在删除盒子时可以找到当前创建的盒子，先进行一次保存，保存在实例对象的属性中
+      this.element = div;
+      
+      //2 设置样式
+      div.style.width = this.width + "px";
+      div.style.height = this.height + "px";
+      div.style.backgroundColor = this.bgColor;
+      //3 放入到地图中
+      this.map.appendChild(div);
+      
+      //4 调用this的随机位置方法
+      this.setRandomPos();
+    };
+    
+    //设置食物盒子的随机位置
+    Food.prototype.setRandomPos = function () {
+      //先计算出随机的坐标值，再根据坐标值设置对应的left/top即可
+      //1 先计算可以容纳的坐标最大值
+      //this.map.offsetWidth / this.width
+      //2 获取范围内的随机坐标
+      this.x = Math.floor(Math.random() * this.map.offsetWidth / this.width);
+      this.y = Math.floor(Math.random() * this.map.offsetHeight / this.height);
+      
+      //3 根据坐标设置left和top属性
+      this.element.style.left = this.x * this.width + "px";
+      this.element.style.top = this.y * this.height + "px";
+    };
+    
+    //暴露操作
+    window.Food = Food;
+  })();
+  
+  //小蛇对象
+  (function () {
+    
+    function Snake(options) {
+      //分析小蛇对象需要哪些属性？
+      //宽 高 背景色 坐标 放置位置 运动方向
+      
+      //将宽高设置为统一的值，其他的坐标等属性进行分别设置
+      this.width = options.width || 20;
+      this.height = options.height || 20;
+      
+      //设置坐标:采用一种较为复杂的结构，目的是保存蛇身内每个小盒子的坐标值
+      this.body = [
+        //当前设置的为小蛇初始的坐标与颜色
+        {x: 3, y: 1, color: "red"},//蛇头
+        {x: 2, y: 1, color: "orange"},//蛇身
+        {x: 1, y: 1, color: "orange"},//蛇身
+      ];
+      //设置放置位置
+      this.map = options.map;
+      //设置运动方向
+      this.direction = options.direction || "right";
+      
+      //设置一个属性，用于保存蛇身的所有结构(DOM对象)，目的为删除时可以找到对应的元素
+      this.elements = [];
+    }
+    
+    //设置小蛇的显示的方法：
+    Snake.prototype.init = function () {
+      //当我们要进行绘制之前，先将旧的蛇身结构进行删除
+      //要删除的是每个标签的结构,先进行遍历操作
+      
+      //可以提前对this.elements进行内容检测，但是没有必要
+//      if(this.elements.length !== 0){}
+      for (var i = 0; i < this.elements.length; i++) {
+        //要删除的是每个标签的结构
+        this.map.removeChild(this.elements[i]);
+        //还需要进行数据的删除
+      }
+      this.elements = [];
+      
+      
+      //1 创建小蛇中的每个部分（遍历this.body中的所有对象）
+      //--- 每次创建完毕后，将蛇身保存到this.elements数组中
+      var div, body;
+      for (i = 0; i < this.body.length; i++) {
+        div = document.createElement("div");
+        div.style.width = this.width + "px";
+        div.style.height = this.height + "px";
+        
+        body = this.body[i];
+        div.style.backgroundColor = body.color;
+        //设置left top
+        div.style.left = body.x * this.width + "px";
+        div.style.top = body.y * this.height + "px";
+        this.map.appendChild(div);
+        this.elements.push(div);
+      }
+//      console.log(this.elements);
+    };
+    
+    //设置小蛇运动的方法：
+    Snake.prototype.move = function () {
+      //分析：
+      //小蛇移动时，需要内部的每个盒子都进行移动，移动是通过坐标的修改实现
+      //除蛇头以外，其余的蛇身中的每个部分都可以使用上一个蛇身的坐标值
+      //蛇头根据运动方向进行判断判断设置即可
+      var body;//用于保存蛇身中的某个对象
+      
+      //遇到的问题是：如果使用正向遍历的方式，导致所有的蛇身坐标均为蛇头的坐标值了
+      /*for (var i = 1; i < this.body.length; i++) {
+       //body表示蛇身中的某一个盒子的所有坐标
+       body = this.body[i];
+       //获取前一项的坐标值即可
+       body.x = this.body[i - 1].x;
+       body.y = this.body[i - 1].y;
+       }*/
+      
+      //需要使用反向遍历的方式：内部的代码不需修改
+      for (var i = this.body.length - 1; i >= 1; i--) {
+        //body表示蛇身中的某一个盒子的所有坐标
+        body = this.body[i];
+        //获取前一项的坐标值即可
+        body.x = this.body[i - 1].x;
+        body.y = this.body[i - 1].y;
+      }
+      //给蛇头的坐标进行单独设置
+      //---后期添加的功能，根据当前操作的按键，设置不同的运动方向
+      //判断this.direction的值
+      switch (this.direction) {
+        case "left":
+          this.body[0].x--;
+          break;
+        case "right":
+          this.body[0].x++;
+          break;
+        case "up":
+          this.body[0].y--;
+          break;
+        case "down":
+          this.body[0].y++;
+          break;
+      }
+      
+      //小蛇body中的所有坐标值更新后，需要进行重新的绘制操作
+      this.init();
+    };
+    
+    //暴露操作
+    window.Snake = Snake;
+  })();
+  
+  //游戏对象：用于操作food和snake进行结合，实现具体的游戏效果，规定了游戏的结束条件。。
+  (function () {
+    //游戏对象的设置：
+    //1 设置game对象的基本属性：snake food map
+    //2 设置game的初始化操作：
+    //   2.1 设置食物和小蛇显示
+    //   2.2 设置小蛇的自动运动
+    //   2.3 设置用户的键盘操作：设置keydown事件，并根据e.keyCode属性值修改snake的direction属性。
+    //3 在snake对象中修改move方法：根据2.3中修改的direction属性设置蛇头的坐标的更改方式。
+    
+    var that;//在游戏的自调用函数中声明一个变量，在game功能中均可访问
+    function Game(options) {
+      //需要的属性：  小蛇   食物   地图
+      this.snake = options.snake;
+      this.food = options.food;
+      this.map = options.map;
+      that = this;//保存当前实例对象，方便访问
+    }
+    
+    //游戏初始化操作:
+    Game.prototype.init = function () {
+      //初始化食物
+      this.food.init();
+      //初始化小蛇
+      this.snake.init();
+      //设置小蛇跑动：让小蛇可以自动的进行move操作
+      this.snakeRun();
+      //设置键盘操作（改变小蛇的移动方向）
+      this.changeDirection();
+    };
+    
+    //设置小蛇的跑动方法：
+    Game.prototype.snakeRun = function () {
+      //设置一个定时器，间隔一段时间，让小蛇执行自身的move方法即可
+      var timer = null;
+      timer = setInterval(function () {
+        var snake = that.snake;
+        var food = that.food;
+        
+        //设置小蛇的运动
+        snake.move();
+        
+       
+        
+        
+        //检测小蛇是不是要死了
+        
+        
+      }, 200);
+      
+    };
+    
+    //设置键盘操作：
+    Game.prototype.changeDirection = function () {
+      //给键盘设置操作:使用onkeydown事件，操作后的反应更自然
+      document.onkeydown = function (e) {
+        var e = e || window.event;
+        
+        //在点击按键时，返回某个按键的键盘码
+        //我们需要的按键为:  37左 38上 39右 40下
+        //console.log(e.keyCode);
+        
+        //根据点击后得到的键盘码，设置小蛇的不同运动方向
+        switch (e.keyCode) {
+          case 37:
+            that.snake.direction = "left";
+            break;
+          case 38:
+            that.snake.direction = "up";
+            break;
+          case 39:
+            that.snake.direction = "right";
+            break;
+          case 40:
+            that.snake.direction = "down";
+            break;
+        }
+        
+      };
+      
+      
+    };
+    
+    
+    var map = document.getElementById("map");
+    var game = new Game({
+      map: map,
+      //传入时需要考虑game功能的需求，需要操作的是实例对象的属性和方法，所以传入的也是实例对象
+      snake: new Snake({map: map}),
+      food: new Food({map: map})
+    });
+
+//    console.log(g1);
+    //游戏开始：
+    game.init();
+    
+    
+  })();
+
+
+</script>
+
+</body>
+</html>
